@@ -12,31 +12,60 @@ const inputCls = 'w-full px-3 py-2 border border-gray-200 dark:border-slate-600 
 const selectCls = `${inputCls} bg-white`
 
 function AddRoomModal({ onClose, onCreated }) {
-  const [types,   setTypes]   = useState([])
-  const [form,    setForm]    = useState({ roomNumber: '', floor: '1', roomTypeId: '' })
-  const [error,   setError]   = useState('')
-  const [loading, setLoading] = useState(false)
+  const [types,    setTypes]    = useState([])
+  const [step,     setStep]     = useState('loading') // 'loading' | 'create-type' | 'room'
+  const [typeForm, setTypeForm] = useState({ name: '', basePrice: '', maxOccupancy: '2' })
+  const [roomForm, setRoomForm] = useState({ roomNumber: '', floor: '1', roomTypeId: '' })
+  const [error,    setError]    = useState('')
+  const [loading,  setLoading]  = useState(false)
 
   useEffect(() => {
     roomsApi.listTypes()
       .then(r => {
         setTypes(r.data)
-        if (r.data.length > 0) setForm(f => ({ ...f, roomTypeId: String(r.data[0].id) }))
+        if (r.data.length > 0) {
+          setRoomForm(f => ({ ...f, roomTypeId: String(r.data[0].id) }))
+          setStep('room')
+        } else {
+          setStep('create-type')
+        }
       })
-      .catch(console.error)
+      .catch(() => setStep('create-type'))
   }, [])
 
-  function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
+  function setT(k, v) { setTypeForm(f => ({ ...f, [k]: v })) }
+  function setR(k, v) { setRoomForm(f => ({ ...f, [k]: v })) }
 
-  async function handleSubmit(e) {
+  async function handleCreateType(e) {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const res = await roomsApi.createType({
+        name:         typeForm.name,
+        basePrice:    parseFloat(typeForm.basePrice),
+        maxOccupancy: parseInt(typeForm.maxOccupancy),
+      })
+      const newType = res.data
+      setTypes(prev => [...prev, newType])
+      setRoomForm(f => ({ ...f, roomTypeId: String(newType.id) }))
+      setStep('room')
+    } catch (err) {
+      setError(err.response?.data?.error ?? 'Failed to create room type')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleCreateRoom(e) {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
       const res = await roomsApi.create({
-        roomNumber: form.roomNumber,
-        floor:      parseInt(form.floor),
-        roomTypeId: parseInt(form.roomTypeId),
+        roomNumber: roomForm.roomNumber,
+        floor:      parseInt(roomForm.floor),
+        roomTypeId: parseInt(roomForm.roomTypeId),
       })
       onCreated(res.data)
       onClose()
@@ -52,46 +81,92 @@ function AddRoomModal({ onClose, onCreated }) {
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-700">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">Add Room</h2>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+              {step === 'create-type' ? 'Create Room Type' : 'Add Room'}
+            </h2>
+            {step === 'create-type' && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Step 1 of 2 — no room types exist yet</p>
+            )}
+          </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X size={18} /></button>
         </div>
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-          {error && <div className="px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-400">{error}</div>}
-          {types.length === 0 && (
-            <div className="px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-amber-700 dark:text-amber-400">
-              No room types found. Create a room type first via the API.
-            </div>
-          )}
-          <div className="grid grid-cols-2 gap-4">
+
+        {step === 'loading' && (
+          <div className="flex justify-center py-8">
+            <div className="w-6 h-6 border-2 border-indigo-200 dark:border-indigo-900 border-t-indigo-600 dark:border-t-indigo-400 rounded-full animate-spin" />
+          </div>
+        )}
+
+        {step === 'create-type' && (
+          <form onSubmit={handleCreateType} className="px-6 py-5 space-y-4">
+            {error && <div className="px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-400">{error}</div>}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Room Number *</label>
-              <input type="text" required value={form.roomNumber} onChange={e => set('roomNumber', e.target.value)}
-                className={inputCls} placeholder="101" />
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type Name *</label>
+              <input type="text" required value={typeForm.name} onChange={e => setT('name', e.target.value)}
+                className={inputCls} placeholder="Standard, Deluxe, Suite…" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Price / Night *</label>
+                <input type="number" required min="1" step="0.01" value={typeForm.basePrice} onChange={e => setT('basePrice', e.target.value)}
+                  className={inputCls} placeholder="99.00" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Max Occupancy *</label>
+                <input type="number" required min="1" max="10" value={typeForm.maxOccupancy} onChange={e => setT('maxOccupancy', e.target.value)}
+                  className={inputCls} />
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={onClose}
+                className="flex-1 px-4 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">Cancel</button>
+              <button type="submit" disabled={loading}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                {loading ? 'Creating…' : 'Create & Continue →'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {step === 'room' && (
+          <form onSubmit={handleCreateRoom} className="px-6 py-5 space-y-4">
+            {error && <div className="px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-400">{error}</div>}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Room Number *</label>
+                <input type="text" required value={roomForm.roomNumber} onChange={e => setR('roomNumber', e.target.value)}
+                  className={inputCls} placeholder="101" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Floor *</label>
+                <input type="number" required min="1" max="50" value={roomForm.floor} onChange={e => setR('floor', e.target.value)}
+                  className={inputCls} />
+              </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Floor *</label>
-              <input type="number" required min="1" max="50" value={form.floor} onChange={e => set('floor', e.target.value)}
-                className={inputCls} />
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Room Type *</label>
+              <select required value={roomForm.roomTypeId} onChange={e => setR('roomTypeId', e.target.value)} className={selectCls}>
+                {types.map(t => (
+                  <option key={t.id} value={t.id}>{t.name} — ${parseFloat(t.basePrice)}/night</option>
+                ))}
+              </select>
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Room Type *</label>
-            <select required value={form.roomTypeId} onChange={e => set('roomTypeId', e.target.value)} className={selectCls}>
-              {types.length === 0 && <option value="">No types available</option>}
-              {types.map(t => (
-                <option key={t.id} value={t.id}>{t.name} — ${parseFloat(t.basePrice)}/night</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">Cancel</button>
-            <button type="submit" disabled={loading || types.length === 0}
-              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-              {loading ? 'Adding…' : 'Add Room'}
-            </button>
-          </div>
-        </form>
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              Need a new type?{' '}
+              <button type="button" onClick={() => { setStep('create-type'); setError('') }}
+                className="text-indigo-500 hover:text-indigo-700 underline">Create one</button>
+            </p>
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={onClose}
+                className="flex-1 px-4 py-2 border border-gray-200 dark:border-slate-600 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">Cancel</button>
+              <button type="submit" disabled={loading}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                {loading ? 'Adding…' : 'Add Room'}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   )
