@@ -30,8 +30,10 @@ app.use('/api/staff',        staffRouter)
 app.use('/api/housekeeping', housekeepingRouter)
 app.use('/api/invoices',     billingRouter)
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`)
-})
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`)
+  })
+}
 
 export default app
