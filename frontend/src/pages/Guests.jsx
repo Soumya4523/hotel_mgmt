@@ -137,7 +137,7 @@ export default function Guests() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60">
-              {['Guest', 'Contact', 'ID Number', 'Loyalty Points', 'Member Since', 'Actions'].map(h => (
+              {['Guest', 'Contact', 'ID Number', 'Loyalty Points', 'Member Since'].map(h => (
                 <th key={h} className="text-left px-5 py-3 font-medium text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide">{h}</th>
               ))}
             </tr>
@@ -167,12 +167,7 @@ export default function Guests() {
                 <td className="px-5 py-3.5 text-gray-500 dark:text-gray-400 text-xs">
                   {g.createdAt ? new Date(g.createdAt).toLocaleDateString() : '—'}
                 </td>
-                <td className="px-5 py-3.5">
-                  <div className="flex gap-3">
-                    <button className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium">View</button>
-                    {canManage && <button className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 font-medium">Edit</button>}
-                  </div>
-                </td>
+                <td className="px-5 py-3.5"></td>
               </tr>
             ))}
           </tbody>
